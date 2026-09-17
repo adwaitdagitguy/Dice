@@ -19,6 +19,12 @@
   You should have received a copy of the GNU General Public License along with
   this program. If not, see <http://www.gnu.org/licenses/>.
 */
+
+/*
+ Modified by Adwait Patkhedkar for the specific use cases of Theomolsci Group 
+ Refactored determinant allocation and construction in SHCI.cpp to use a non-Cartesian representation where applicable, 
+ eliminating redundant state materialization and reducing peak memory usage
+*/
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -92,7 +98,7 @@ void license(char* argv[]) {
   pout << endl;
   pout << "**************************************************************"
        << endl;
-  pout << "Dice  Copyright (C) 2017  Sandeep Sharma, modified by Adwait Patkhedkar (2026)" << endl;
+  pout << "Dice  Copyright (C) 2017  Sandeep Sharma" << endl;
   pout << endl;
   pout << "This program is distributed in the hope that it will be useful,"
        << endl;
@@ -111,6 +117,7 @@ void license(char* argv[]) {
   pout << "**************************************************************"
        << endl;
   pout << endl;
+  pout << "Modified by Adwait Patkhedkar (2026), eliminating dense representation" <<endl;
 
   char* user;
   user = (char*)malloc(10 * sizeof(char));
@@ -361,13 +368,9 @@ int main(int argc, char* argv[]) {
     }
 
     // Make HF determinant
-    pout << "DEBUG: nAlphaDets = " << nAlphaDets << endl;
-    pout << "DEBUG: nBetaDets = " << nBetaDets << endl;
-    pout << "DEBUG: About to allocate " << (nAlphaDets) << " determinants" << endl;
-    pout << "DEBUG: Estimated memory: " << ((nAlphaDets*sizeof(Determinant))/1e9) << " GB" << endl;
+    
     pout << std::flush;  // Force immediate write to log
     Dets.resize(nAlphaDets);
-    pout << "DEBUG: Allocation succeeded, now filling determinants..." << endl;
     pout << std::flush;
     for (int i = 0; i < nAlphaDets; i++) 
     {
@@ -435,38 +438,28 @@ int main(int argc, char* argv[]) {
   pout << endl;
   pout << "**************************************************************"
        << endl;
-  pout << "VARIATIONAL STEP DEAR  " << endl;
   pout << "**************************************************************"
        << endl;
 
   vector<double> E0;
 #ifndef Complex
   if (schd.cdfci_on == 0 && schd.restart) {
-      pout<<"SEQUENTIAL_SOLVE_OMP START"<<endl;
       cdfci::sequential_solve_omp(schd, I1, I2, I2HBSHM, irrep, coreE, E0, ci, Dets);
-      pout<<"SEQUENTIAL_SOLVE_OMP END"<<endl;
   }
   else {
     pout<<"DO VARIATIONAL START"<<endl;
     E0 = SHCIbasics::DoVariational(
         ci, Dets, schd, I2, I2HBSHM, irrep, I1, coreE, nelec, schd.DoRDM);
-    pout<<"DO VARIATIONAL END"<<endl;
   }
 #else
-    pout<<"DO VARIATIONAL COMPLEX DEFINED START"<<endl;
     E0 = SHCIbasics::DoVariational(
         ci, Dets, schd, I2, I2HBSHM, irrep, I1, coreE, nelec, schd.DoRDM);
-    pout<<"DO VARIATIONAL COMPLEX DEFINED ENDS"<<endl;
 #endif
   Determinant* SHMDets;
-  pout<<"ALLOCATION OF SHARED MEMORY BEGINS"<<endl;
   SHMVecFromVecs(Dets, SHMDets, shciDetsCI, DetsCISegment, regionDetsCI);
-  pout<<"ALLOCATION OF SHARED MEMORY ENDL"<<endl;
   int DetsSize = Dets.size();
 #ifndef SERIAL
-  pout<<"BROADCAST MPI PROCESS START"<<endl;
   mpi::broadcast(world, DetsSize, 0);
-  pout<<"BROADCAST MPI PROCESS END"<<endl;
 #endif
   Dets.clear();
 
